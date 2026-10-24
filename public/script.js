@@ -330,6 +330,15 @@ const liveCaptionText = document.getElementById('liveCaptionText');
 const toggleLiveCaptionBtn = document.getElementById('toggleLiveCaptionBtn');
 const liveCaptionToggleLabel = document.getElementById('liveCaptionToggleLabel');
 
+// New UI Polish Elements
+const laserScanBar = document.getElementById('laserScanBar');
+const samplePillsBar = document.getElementById('samplePillsBar');
+const rankIconLarge = document.getElementById('rankIconLarge');
+const rankLabelMain = document.getElementById('rankLabelMain');
+const rankSubText = document.getElementById('rankSubText');
+const rankPercentage = document.getElementById('rankPercentage');
+const rankProgressFill = document.getElementById('rankProgressFill');
+
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
   initLanguage();
@@ -485,6 +494,14 @@ function setupEventListeners() {
   // Live Caption Toggle
   toggleLiveCaptionBtn.addEventListener('click', toggleLiveCaptioning);
 
+  // One-click Sample Waste Buttons
+  document.querySelectorAll('.sample-pill').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const sample = e.currentTarget.getAttribute('data-sample');
+      loadSampleWaste(sample);
+    });
+  });
+
   // Initial key status check
   if (state.geminiApiKey) {
     updateApiKeyStatusUI(true);
@@ -518,7 +535,71 @@ function displayImagePreview(dataUrl) {
   imagePreview.src = dataUrl;
   previewContainer.classList.remove('hidden');
   dropZone.classList.add('hidden');
+  samplePillsBar.classList.add('hidden');
   resultsSection.classList.add('hidden');
+}
+
+function loadSampleWaste(type) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 600;
+  canvas.height = 380;
+  const ctx = canvas.getContext('2d');
+
+  // Background
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, 380);
+  bgGrad.addColorStop(0, '#f8fafc');
+  bgGrad.addColorStop(1, '#e2e8f0');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, 600, 380);
+
+  // Soft shadow surface
+  ctx.fillStyle = 'rgba(0,0,0,0.08)';
+  ctx.beginPath();
+  ctx.ellipse(300, 275, 140, 20, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  let title = '';
+  let color = '#15803d';
+
+  if (type === 'banana') {
+    ctx.font = '100px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🍌', 300, 220);
+    title = 'Wet Organic Waste: Fresh Banana Peel';
+    color = '#15803d';
+  } else if (type === 'bottle') {
+    ctx.font = '100px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🥤', 300, 220);
+    title = 'Dry Recyclable: Empty Plastic Bottle';
+    color = '#0284c7';
+  } else if (type === 'battery') {
+    ctx.font = '100px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🔋', 300, 220);
+    title = 'Hazardous Waste: Discarded AA Battery';
+    color = '#dc2626';
+  } else if (type === 'carton') {
+    ctx.font = '100px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('📦', 300, 220);
+    title = 'Dry Recyclable: Corrugated Shipping Box';
+    color = '#b45309';
+  } else {
+    ctx.font = '100px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('💡', 300, 220);
+    title = 'Domestic Hazardous: Compact Fluorescent Lamp';
+    color = '#dc2626';
+  }
+
+  ctx.font = 'bold 22px sans-serif';
+  ctx.fillStyle = color;
+  ctx.fillText(title, 300, 325);
+
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+  state.currentImageBase64 = dataUrl;
+  displayImagePreview(dataUrl);
 }
 
 function resetImageState() {
@@ -527,7 +608,9 @@ function resetImageState() {
   imagePreview.src = '';
   previewContainer.classList.add('hidden');
   dropZone.classList.remove('hidden');
+  samplePillsBar.classList.remove('hidden');
   loadingState.classList.add('hidden');
+  laserScanBar.classList.add('hidden');
   resultsSection.classList.add('hidden');
   stopCamera();
 }
@@ -740,9 +823,9 @@ function showSettingsAlert(msg, type) {
 async function performAnalysis() {
   if (!state.currentImageBase64) return;
 
-  // Show loading state with rotating fact
+  // Show loading state with rotating fact & activate laser scanner
   loadingState.classList.remove('hidden');
-  previewContainer.classList.add('hidden');
+  laserScanBar.classList.remove('hidden');
   resultsSection.classList.add('hidden');
 
   let factIdx = 0;
@@ -765,6 +848,7 @@ async function performAnalysis() {
 
     clearInterval(factInterval);
     loadingState.classList.add('hidden');
+    laserScanBar.classList.add('hidden');
 
     if (!response.ok) {
       const errJson = await response.json().catch(() => ({}));
@@ -786,6 +870,7 @@ async function performAnalysis() {
   } catch (error) {
     clearInterval(factInterval);
     loadingState.classList.add('hidden');
+    laserScanBar.classList.add('hidden');
     previewContainer.classList.remove('hidden');
 
     console.warn('API Error, using rule-based fallback:', error);
@@ -850,22 +935,44 @@ function updateGamificationUI() {
   const divertedKg = (state.totalScans * 0.25).toFixed(1);
   landfillDiverted.textContent = `${divertedKg} kg`;
 
-  // Tier calculation
+  // Tier calculation & progress
   let rank = 'Swachhta Cadet';
   let badgeLabel = 'Cadet';
+  let icon = '🌱';
+  let pct = 0;
+  let sub = 'Earn 40 points to reach Green Citizen';
+
   if (state.ecoPoints >= 200) {
     rank = 'Swachhta Warrior 🏆';
     badgeLabel = 'Warrior';
+    icon = '🏆';
+    pct = 100;
+    sub = 'Maximum Level Reached! Master of Swachhta.';
   } else if (state.ecoPoints >= 100) {
     rank = 'Eco Champion ⭐';
     badgeLabel = 'Champion';
+    icon = '⭐';
+    pct = Math.min(100, Math.round(((state.ecoPoints - 100) / 100) * 100));
+    sub = `${200 - state.ecoPoints} pts needed for Swachhta Warrior`;
   } else if (state.ecoPoints >= 40) {
     rank = 'Green Citizen 🌿';
     badgeLabel = 'Citizen';
+    icon = '🌿';
+    pct = Math.min(100, Math.round(((state.ecoPoints - 40) / 60) * 100));
+    sub = `${100 - state.ecoPoints} pts needed for Eco Champion`;
+  } else {
+    pct = Math.min(100, Math.round((state.ecoPoints / 40) * 100));
+    sub = `${40 - state.ecoPoints} pts needed for Green Citizen`;
   }
 
   userTier.textContent = badgeLabel;
   badgeTitle.textContent = rank;
+
+  if (rankIconLarge) rankIconLarge.textContent = icon;
+  if (rankLabelMain) rankLabelMain.textContent = rank;
+  if (rankSubText) rankSubText.textContent = sub;
+  if (rankPercentage) rankPercentage.textContent = `${pct}%`;
+  if (rankProgressFill) rankProgressFill.style.width = `${Math.max(6, pct)}%`;
 }
 
 // --- Render Classification Results ---

@@ -62,11 +62,34 @@
   <main class="main-content">
     <!-- Hero Section -->
     <section class="hero-section">
-      <div class="hero-badge" data-i18n="hero_badge">🇮🇳 Segregate at Source • स्वच्छ भारत मिशन</div>
-      <h2 class="hero-title" data-i18n="hero_title">Smart Waste Classification with Vision AI</h2>
+      <div class="hero-badge-wrapper">
+        <span class="hero-badge-dot"></span>
+        <span class="hero-badge" data-i18n="hero_badge">🇮🇳 Swachh Bharat 2.0 • Powered by Gemini Vision AI</span>
+      </div>
+      <h2 class="hero-title">
+        <span class="gradient-text">Smart Waste Classification</span><br>for Cleaner Indian Cities
+      </h2>
       <p class="hero-desc" data-i18n="hero_desc">
-        Snap or upload a photo of household garbage. Our AI identifies each item, pinpoints the exact municipal bin (Wet, Dry, Hazardous, E-waste, Sanitary), and gives step-by-step disposal guidance suited for Indian households.
+        Snap or upload a photo of household garbage. Our Computer Vision AI identifies each item, pinpoints the exact municipal bin (Wet, Dry, Hazardous, E-waste, Sanitary), and gives step-by-step disposal guidance suited for Indian households.
       </p>
+
+      <!-- Live Mission Metric Ticker -->
+      <div class="hero-metrics-strip">
+        <div class="metric-item">
+          <span class="metric-num">150,000+</span>
+          <span class="metric-label">Tonnes/Day SWM Tracked</span>
+        </div>
+        <div class="metric-divider"></div>
+        <div class="metric-item">
+          <span class="metric-num">6 Bins</span>
+          <span class="metric-label">SWM 2016 Compliant</span>
+        </div>
+        <div class="metric-divider"></div>
+        <div class="metric-item">
+          <span class="metric-num">100%</span>
+          <span class="metric-label">In-Memory Privacy</span>
+        </div>
+      </div>
     </section>
 
     <!-- Scanner & Camera Section -->
@@ -94,7 +117,13 @@
         <div class="camera-viewport">
           <video id="cameraVideo" autoplay playsinline muted></video>
           <canvas id="cameraCanvas" style="display:none;"></canvas>
-          <div class="camera-overlay-grid"></div>
+          <div class="camera-overlay-grid">
+            <span class="viewfinder-corner tl"></span>
+            <span class="viewfinder-corner tr"></span>
+            <span class="viewfinder-corner bl"></span>
+            <span class="viewfinder-corner br"></span>
+            <div class="camera-crosshair"></div>
+          </div>
           
           <!-- Live Caption HUD overlay -->
           <div id="liveCaptionHUD" class="live-caption-hud hidden">
@@ -121,9 +150,23 @@
       <!-- Drag & Drop Upload Zone -->
       <div id="dropZone" class="drop-zone">
         <div class="drop-zone-content">
-          <div class="upload-art">♻️</div>
+          <div class="upload-art-ring">
+            <span class="upload-art">♻️</span>
+          </div>
           <p class="drop-zone-title" data-i18n="drop_zone_title">Drag & drop your waste image here</p>
           <span class="drop-zone-sub" data-i18n="drop_zone_sub">Supports JPG, PNG, WEBP (Max 5 MB)</span>
+        </div>
+      </div>
+
+      <!-- Instant Demo Sample Waste Pills -->
+      <div id="samplePillsBar" class="sample-pills-bar">
+        <span class="sample-label">⚡ <strong>One-Click Test Samples:</strong></span>
+        <div class="sample-pills-list">
+          <button type="button" class="sample-pill" data-sample="banana">🍌 Banana Peel</button>
+          <button type="button" class="sample-pill" data-sample="bottle">🥤 Plastic Bottle</button>
+          <button type="button" class="sample-pill" data-sample="battery">🔋 AA Battery</button>
+          <button type="button" class="sample-pill" data-sample="carton">📦 Amazon Carton</button>
+          <button type="button" class="sample-pill" data-sample="bulb">💡 CFL Bulb</button>
         </div>
       </div>
 
@@ -131,6 +174,7 @@
       <div id="previewContainer" class="preview-container hidden">
         <div class="preview-box">
           <img id="imagePreview" alt="Waste preview" />
+          <div id="laserScanBar" class="laser-scan-bar hidden"></div>
           <button id="removeImageBtn" class="btn-remove" title="Remove image">✕</button>
         </div>
         <div class="preview-actions">
@@ -263,6 +307,23 @@
           <div class="stat-icon">🏆</div>
           <div class="stat-value" id="badgeTitle">Swachhta Cadet</div>
           <div class="stat-label" data-i18n="stat_badge">Current Rank</div>
+        </div>
+      </div>
+
+      <!-- Rank Level Progress Bar -->
+      <div class="rank-progress-card">
+        <div class="rank-progress-header">
+          <div class="rank-badge-preview">
+            <span class="rank-icon-large" id="rankIconLarge">🌱</span>
+            <div>
+              <h5 id="rankLabelMain">Swachhta Cadet</h5>
+              <span class="rank-sub-text" id="rankSubText">Earn 40 points to reach Green Citizen</span>
+            </div>
+          </div>
+          <span class="rank-percentage" id="rankPercentage">0%</span>
+        </div>
+        <div class="rank-progress-track">
+          <div class="rank-progress-fill" id="rankProgressFill" style="width: 5%;"></div>
         </div>
       </div>
 
