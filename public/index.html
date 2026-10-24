@@ -49,6 +49,12 @@
           <span class="lang-icon">🌐</span>
           <span id="langLabel">हिन्दी</span>
         </button>
+
+        <!-- API Key Settings Button -->
+        <button id="openSettingsBtn" class="btn-lang" title="Gemini API Key Settings">
+          <span class="lang-icon">🔑</span>
+          <span id="apiKeyBtnText">API Key</span>
+        </button>
       </div>
     </div>
   </header>
@@ -89,9 +95,21 @@
           <video id="cameraVideo" autoplay playsinline muted></video>
           <canvas id="cameraCanvas" style="display:none;"></canvas>
           <div class="camera-overlay-grid"></div>
+          
+          <!-- Live Caption HUD overlay -->
+          <div id="liveCaptionHUD" class="live-caption-hud hidden">
+            <span class="hud-live-tag">🔴 LIVE AI</span>
+            <span id="liveCaptionText">Point camera steadily at waste...</span>
+          </div>
         </div>
         <div class="camera-actions">
           <button id="cameraCloseBtn" class="btn btn-ghost" data-i18n="btn_cancel">Cancel</button>
+          
+          <button id="toggleLiveCaptionBtn" class="btn btn-live-toggle" title="Toggle Auto Live Captioning">
+            <span class="live-indicator-dot"></span>
+            <span id="liveCaptionToggleLabel">Live Caption: OFF</span>
+          </button>
+
           <button id="cameraSnapBtn" class="btn btn-capture">
             <span class="shutter-circle"></span>
             <span data-i18n="btn_capture">Capture</span>
@@ -332,6 +350,38 @@
       <p>© 2026 EcoSort AI. Built with ❤️ for a Cleaner, Greener India.</p>
     </div>
   </footer>
+
+  <!-- Gemini API Key Settings Modal -->
+  <div id="settingsModal" class="modal-backdrop hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>🔑 Gemini Vision API Configuration</h3>
+        <button id="closeSettingsBtn" class="modal-close-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">
+          Enter your Google Gemini API Key to enable <strong>Live Video Captioning</strong> and <strong>Real-Time AI Waste Classification</strong>.
+        </p>
+
+        <div class="input-group">
+          <label for="apiKeyInput">Google Gemini API Key:</label>
+          <div class="password-wrapper">
+            <input type="password" id="apiKeyInput" placeholder="AIzaSy..." autocomplete="off">
+            <button type="button" id="toggleApiKeyVisibility" class="btn-eye" title="Show/Hide">👁️</button>
+          </div>
+          <span class="help-text">
+            Get your free API key at <a href="https://aistudio.google.com/" target="_blank" rel="noopener">Google AI Studio</a>.
+          </span>
+        </div>
+
+        <div id="settingsAlert" class="settings-alert hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="removeKeyBtn" class="btn btn-ghost-danger">Remove Key</button>
+        <button id="saveKeyBtn" class="btn btn-primary">Save & Activate</button>
+      </div>
+    </div>
+  </div>
 
   <script src="script.js"></script>
 </body>

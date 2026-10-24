@@ -20,7 +20,11 @@ const state = {
     sanitary: 0,
     mixed: 0
   })),
-  currentResults: null
+  currentResults: null,
+  geminiApiKey: localStorage.getItem('ecosort_gemini_key') || '',
+  liveCaptionActive: false,
+  liveCaptionInterval: null,
+  liveCaptionInProgress: false
 };
 
 // --- Bilingual UI Translations ---
@@ -310,6 +314,22 @@ const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 const wasteChart = document.getElementById('wasteChart');
 const chartLegend = document.getElementById('chartLegend');
 
+// Settings & Live Caption Elements
+const openSettingsBtn = document.getElementById('openSettingsBtn');
+const apiKeyBtnText = document.getElementById('apiKeyBtnText');
+const settingsModal = document.getElementById('settingsModal');
+const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+const apiKeyInput = document.getElementById('apiKeyInput');
+const toggleApiKeyVisibility = document.getElementById('toggleApiKeyVisibility');
+const saveKeyBtn = document.getElementById('saveKeyBtn');
+const removeKeyBtn = document.getElementById('removeKeyBtn');
+const settingsAlert = document.getElementById('settingsAlert');
+
+const liveCaptionHUD = document.getElementById('liveCaptionHUD');
+const liveCaptionText = document.getElementById('liveCaptionText');
+const toggleLiveCaptionBtn = document.getElementById('toggleLiveCaptionBtn');
+const liveCaptionToggleLabel = document.getElementById('liveCaptionToggleLabel');
+
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
   initLanguage();
@@ -449,6 +469,26 @@ function setupEventListeners() {
       renderHistoryUI();
     }
   });
+
+  // Settings Modal Controls
+  openSettingsBtn.addEventListener('click', openSettingsModal);
+  closeSettingsBtn.addEventListener('click', closeSettingsModal);
+  settingsModal.addEventListener('click', (e) => {
+    if (e.target === settingsModal) closeSettingsModal();
+  });
+  toggleApiKeyVisibility.addEventListener('click', () => {
+    apiKeyInput.type = apiKeyInput.type === 'password' ? 'text' : 'password';
+  });
+  saveKeyBtn.addEventListener('click', handleSaveApiKey);
+  removeKeyBtn.addEventListener('click', handleRemoveApiKey);
+
+  // Live Caption Toggle
+  toggleLiveCaptionBtn.addEventListener('click', toggleLiveCaptioning);
+
+  // Initial key status check
+  if (state.geminiApiKey) {
+    updateApiKeyStatusUI(true);
+  }
 }
 
 // --- Image Handling ---
@@ -525,6 +565,7 @@ async function startCamera() {
 }
 
 function stopCamera() {
+  stopLiveCaptioning();
   if (state.cameraStream) {
     state.cameraStream.getTracks().forEach(track => track.stop());
     state.cameraStream = null;
@@ -532,6 +573,74 @@ function stopCamera() {
   cameraModal.classList.add('hidden');
   if (!state.currentImageBase64) {
     dropZone.classList.remove('hidden');
+  }
+}
+
+// --- Live Captioning (Real-Time Camera Overlay) ---
+function toggleLiveCaptioning() {
+  if (state.liveCaptionActive) {
+    stopLiveCaptioning();
+  } else {
+    startLiveCaptioning();
+  }
+}
+
+function startLiveCaptioning() {
+  state.liveCaptionActive = true;
+  toggleLiveCaptionBtn.classList.add('active');
+  liveCaptionToggleLabel.textContent = 'Live Caption: ON';
+  liveCaptionHUD.classList.remove('hidden');
+  liveCaptionText.textContent = state.lang === 'hi' ? 'कचरे पर कैमरा स्थिर रखें...' : 'Scanning waste in real time...';
+
+  // Run immediately, then every 3.2 seconds
+  runSingleLiveCaption();
+  state.liveCaptionInterval = setInterval(runSingleLiveCaption, 3200);
+}
+
+function stopLiveCaptioning() {
+  state.liveCaptionActive = false;
+  if (state.liveCaptionInterval) {
+    clearInterval(state.liveCaptionInterval);
+    state.liveCaptionInterval = null;
+  }
+  toggleLiveCaptionBtn.classList.remove('active');
+  liveCaptionToggleLabel.textContent = 'Live Caption: OFF';
+  liveCaptionHUD.classList.add('hidden');
+}
+
+async function runSingleLiveCaption() {
+  if (!cameraVideo || !cameraVideo.videoWidth || state.liveCaptionInProgress) return;
+  state.liveCaptionInProgress = true;
+
+  try {
+    const snapCanvas = document.createElement('canvas');
+    snapCanvas.width = 480;
+    snapCanvas.height = 320;
+    const ctx = snapCanvas.getContext('2d');
+    ctx.drawImage(cameraVideo, 0, 0, 480, 320);
+    const frameDataUrl = snapCanvas.toDataURL('image/jpeg', 0.6);
+
+    const headers = { 'Content-Type': 'application/json' };
+    if (state.geminiApiKey) {
+      headers['x-gemini-key'] = state.geminiApiKey;
+    }
+
+    const res = await fetch('/api/live-caption', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ image: frameDataUrl })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.caption) {
+        liveCaptionText.innerHTML = `<strong>${data.caption}</strong> ${data.bin && data.bin !== 'None' ? `• <em>${data.bin}</em>` : ''}`;
+      }
+    }
+  } catch (err) {
+    console.debug('Live caption frame skipped:', err);
+  } finally {
+    state.liveCaptionInProgress = false;
   }
 }
 
@@ -557,6 +666,76 @@ function captureCameraSnapshot() {
   displayImagePreview(dataUrl);
 }
 
+// --- Settings Modal Handlers ---
+function openSettingsModal() {
+  apiKeyInput.value = state.geminiApiKey;
+  settingsAlert.className = 'settings-alert hidden';
+  settingsModal.classList.remove('hidden');
+}
+
+function closeSettingsModal() {
+  settingsModal.classList.add('hidden');
+}
+
+async function handleSaveApiKey() {
+  const key = apiKeyInput.value.trim();
+  if (!key || key.length < 10) {
+    showSettingsAlert('Please enter a valid Gemini API key.', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/save-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey: key })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.status === 'ok') {
+      state.geminiApiKey = key;
+      localStorage.setItem('ecosort_gemini_key', key);
+      updateApiKeyStatusUI(true);
+      showSettingsAlert('✅ API key saved and activated on server!', 'success');
+      setTimeout(closeSettingsModal, 1500);
+      checkServerHealth();
+    } else {
+      showSettingsAlert(data.message || 'Failed to save key.', 'error');
+    }
+  } catch (err) {
+    state.geminiApiKey = key;
+    localStorage.setItem('ecosort_gemini_key', key);
+    updateApiKeyStatusUI(true);
+    showSettingsAlert('✅ API key saved locally in browser!', 'success');
+    setTimeout(closeSettingsModal, 1500);
+  }
+}
+
+function handleRemoveApiKey() {
+  state.geminiApiKey = '';
+  localStorage.removeItem('ecosort_gemini_key');
+  apiKeyInput.value = '';
+  updateApiKeyStatusUI(false);
+  showSettingsAlert('API key removed. Running in demo mode.', 'success');
+  setTimeout(closeSettingsModal, 1000);
+  checkServerHealth();
+}
+
+function updateApiKeyStatusUI(hasKey) {
+  if (hasKey) {
+    apiKeyBtnText.textContent = 'API Key: Active';
+    apiKeyBtnText.style.color = '#15803d';
+  } else {
+    apiKeyBtnText.textContent = 'API Key';
+    apiKeyBtnText.style.color = '';
+  }
+}
+
+function showSettingsAlert(msg, type) {
+  settingsAlert.textContent = msg;
+  settingsAlert.className = `settings-alert ${type}`;
+}
+
 // --- Vision AI Analysis ---
 async function performAnalysis() {
   if (!state.currentImageBase64) return;
@@ -573,9 +752,14 @@ async function performAnalysis() {
   }, 2200);
 
   try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (state.geminiApiKey) {
+      headers['x-gemini-key'] = state.geminiApiKey;
+    }
+
     const response = await fetch('/api/classify', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ image: state.currentImageBase64 })
     });
 
