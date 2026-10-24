@@ -7,7 +7,16 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 let GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+
+// Fallback Model Pool for maximum resilience
+const CANDIDATE_MODELS = [
+  process.env.GEMINI_MODEL || 'gemini-3.5-flash',
+  'gemini-3.5-flash',
+  'gemini-3.8-flash',
+  'gemini-flash-latest',
+  'gemini-3.1-flash-lite'
+];
 
 // Middleware
 app.use(cors());
@@ -70,12 +79,50 @@ function getActiveKey(req) {
   return GEMINI_API_KEY;
 }
 
+// Resilient Gemini Invoker with automatic fallback across models
+async function callGeminiWithFallback(apiKey, requestBody) {
+  let lastError = null;
+  const uniqueModels = [...new Set(CANDIDATE_MODELS.filter(Boolean))];
+
+  for (const model of uniqueModels) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return { success: true, data, model };
+      }
+
+      const errText = await response.text();
+      console.warn(`Model ${model} returned ${response.status}: ${errText.substring(0, 100)}`);
+      lastError = { status: response.status, message: errText };
+
+      // If model is retired (404) or busy (503/429), try next available model in candidate pool
+      if (response.status === 404 || response.status === 503 || response.status === 429) {
+        continue;
+      } else {
+        break;
+      }
+    } catch (err) {
+      console.warn(`Network error with model ${model}:`, err.message);
+      lastError = { status: 500, message: err.message };
+    }
+  }
+
+  return { success: false, error: lastError };
+}
+
 // API: Health Check
 app.get('/api/health', (req, res) => {
   const isKeyConfigured = Boolean(GEMINI_API_KEY && GEMINI_API_KEY.length > 10 && GEMINI_API_KEY !== 'your_gemini_api_key_here');
   res.json({
     status: 'ok',
-    version: '1.1.0',
+    version: '1.2.0',
     ai_configured: isKeyConfigured,
     model: GEMINI_MODEL,
     message: isKeyConfigured ? 'Vision AI is active.' : 'Demo Mode: Add GEMINI_API_KEY in .env or via settings.'
@@ -93,7 +140,6 @@ app.post('/api/save-key', (req, res) => {
     const cleanKey = apiKey.trim();
     GEMINI_API_KEY = cleanKey;
 
-    // Write or update .env file
     const envPath = path.join(__dirname, '.env');
     let envContent = `PORT=${PORT}\nGEMINI_API_KEY=${cleanKey}\nGEMINI_MODEL=${GEMINI_MODEL}\n`;
     fs.writeFileSync(envPath, envContent, 'utf8');
@@ -134,7 +180,6 @@ app.post('/api/live-caption', async (req, res) => {
       });
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${activeKey}`;
     const requestBody = {
       contents: [{
         role: "user",
@@ -150,18 +195,12 @@ app.post('/api/live-caption', async (req, res) => {
       }
     };
 
-    const apiResponse = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!apiResponse.ok) {
+    const callResult = await callGeminiWithFallback(activeKey, requestBody);
+    if (!callResult.success) {
       return res.status(502).json({ status: 'error', caption: 'Live caption temporarily unavailable.' });
     }
 
-    const data = await apiResponse.json();
-    const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const candidate = callResult.data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!candidate) return res.json({ caption: "Scanning for waste...", category: "None", bin: "None" });
 
     let cleaned = candidate.trim().replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
@@ -201,7 +240,6 @@ app.post('/api/classify', async (req, res) => {
       return res.json(generateDemoResponse());
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${activeKey}`;
     const requestBody = {
       contents: [{
         role: "user",
@@ -216,23 +254,17 @@ app.post('/api/classify', async (req, res) => {
       }
     };
 
-    const apiResponse = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody)
-    });
+    const callResult = await callGeminiWithFallback(activeKey, requestBody);
 
-    if (!apiResponse.ok) {
-      const errText = await apiResponse.text();
-      console.error('Gemini API Error:', apiResponse.status, errText);
+    if (!callResult.success) {
+      console.error('All candidate Gemini models failed:', callResult.error);
       return res.status(502).json({
         status: 'error',
-        message: `Gemini API returned error (${apiResponse.status}). Please verify your API key or quota.`
+        message: `Gemini API returned error (${callResult.error?.status || 502}). Please check your API key or quota.`
       });
     }
 
-    const data = await apiResponse.json();
-    const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const candidate = callResult.data.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!candidate) {
       return res.status(502).json({
@@ -309,12 +341,6 @@ function generateDemoResponse() {
 app.listen(PORT, () => {
   console.log(`=======================================================`);
   console.log(`🌱 EcoSort AI Server running at: http://localhost:${PORT}`);
-  console.log(`🌿 Live Captioning & Gemini Vision Engine Ready`);
-  if (!GEMINI_API_KEY || GEMINI_API_KEY === 'your_gemini_api_key_here') {
-    console.log(`⚠️  NOTE: GEMINI_API_KEY not configured yet.`);
-    console.log(`   Configure via Settings in UI or .env file.`);
-  } else {
-    console.log(`✅ Gemini Vision AI Model: ${GEMINI_MODEL} is ACTIVE.`);
-  }
+  console.log(`🌿 Resilient Vision AI Model: ${GEMINI_MODEL} is ACTIVE.`);
   console.log(`=======================================================`);
 });
