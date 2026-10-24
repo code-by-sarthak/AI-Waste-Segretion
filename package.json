@@ -1,0 +1,26 @@
+{
+  "name": "ecosort-ai",
+  "version": "1.0.0",
+  "description": "AI-Powered Waste Segregation & Disposal Recommendation Platform inspired by Swachh Bharat Mission and SWM Rules 2016",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "waste-segregation",
+    "swachh-bharat",
+    "ai",
+    "computer-vision",
+    "gemini",
+    "recycling",
+    "smart-city"
+  ],
+  "author": "EcoSort AI Team",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}

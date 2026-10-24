@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoSort AI – Smart Waste Segregation Assistant (Swachh Bharat & SWM 2016)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- System Status Banner -->
+  <div id="statusBanner" class="status-banner">
+    <div class="banner-content">
+      <span class="status-indicator" id="statusIndicator"></span>
+      <span id="statusText">Checking AI Vision Service...</span>
+    </div>
+  </div>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand">
+        <span class="brand-icon">🌱</span>
+        <div class="brand-text">
+          <h1>EcoSort AI</h1>
+          <span class="brand-sub">Swachh Bharat & SWM Rules 2016</span>
+        </div>
+      </div>
+
+      <nav class="nav-links">
+        <a href="#scannerSection" class="nav-link active" data-i18n="nav_scan">Scan Waste</a>
+        <a href="#guideSection" class="nav-link" data-i18n="nav_guide">Waste Guide</a>
+        <a href="#dashboardSection" class="nav-link" data-i18n="nav_impact">My Impact</a>
+        <a href="#historySection" class="nav-link" data-i18n="nav_history">History</a>
+      </nav>
+
+      <div class="nav-actions">
+        <!-- Eco Points Pill -->
+        <div class="eco-badge-pill" id="ecoPointsPill" title="Your Eco Impact Score">
+          <span class="eco-leaf">🌿</span>
+          <span id="ecoPointsText">0 pts</span>
+          <span class="user-tier" id="userTier">Beginner</span>
+        </div>
+
+        <!-- Language Toggle Button -->
+        <button id="langToggleBtn" class="btn-lang" title="Switch Language / भाषा बदलें">
+          <span class="lang-icon">🌐</span>
+          <span id="langLabel">हिन्दी</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <!-- Hero Section -->
+    <section class="hero-section">
+      <div class="hero-badge" data-i18n="hero_badge">🇮🇳 Segregate at Source • स्वच्छ भारत मिशन</div>
+      <h2 class="hero-title" data-i18n="hero_title">Smart Waste Classification with Vision AI</h2>
+      <p class="hero-desc" data-i18n="hero_desc">
+        Snap or upload a photo of household garbage. Our AI identifies each item, pinpoints the exact municipal bin (Wet, Dry, Hazardous, E-waste, Sanitary), and gives step-by-step disposal guidance suited for Indian households.
+      </p>
+    </section>
+
+    <!-- Scanner & Camera Section -->
+    <section id="scannerSection" class="scanner-card">
+      <div class="scanner-header">
+        <h3 data-i18n="scanner_header">Identify Waste Item</h3>
+        <p class="sub-text" data-i18n="scanner_sub">Upload a clear photo or snap live using your device camera</p>
+      </div>
+
+      <!-- Action Choice: File Upload vs Camera -->
+      <div class="input-controls">
+        <button id="cameraOpenBtn" class="btn btn-secondary">
+          <span class="icon">📷</span>
+          <span data-i18n="btn_open_camera">Use Live Camera</span>
+        </button>
+        <label for="fileInput" class="btn btn-primary file-label">
+          <span class="icon">📁</span>
+          <span data-i18n="btn_upload_photo">Upload Photo</span>
+        </label>
+        <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" style="display:none;">
+      </div>
+
+      <!-- Live WebRTC Camera Modal / Viewport -->
+      <div id="cameraModal" class="camera-modal hidden">
+        <div class="camera-viewport">
+          <video id="cameraVideo" autoplay playsinline muted></video>
+          <canvas id="cameraCanvas" style="display:none;"></canvas>
+          <div class="camera-overlay-grid"></div>
+        </div>
+        <div class="camera-actions">
+          <button id="cameraCloseBtn" class="btn btn-ghost" data-i18n="btn_cancel">Cancel</button>
+          <button id="cameraSnapBtn" class="btn btn-capture">
+            <span class="shutter-circle"></span>
+            <span data-i18n="btn_capture">Capture</span>
+          </button>
+          <button id="cameraFlipBtn" class="btn btn-ghost" title="Switch Camera">🔄</button>
+        </div>
+      </div>
+
+      <!-- Drag & Drop Upload Zone -->
+      <div id="dropZone" class="drop-zone">
+        <div class="drop-zone-content">
+          <div class="upload-art">♻️</div>
+          <p class="drop-zone-title" data-i18n="drop_zone_title">Drag & drop your waste image here</p>
+          <span class="drop-zone-sub" data-i18n="drop_zone_sub">Supports JPG, PNG, WEBP (Max 5 MB)</span>
+        </div>
+      </div>
+
+      <!-- Image Preview Area -->
+      <div id="previewContainer" class="preview-container hidden">
+        <div class="preview-box">
+          <img id="imagePreview" alt="Waste preview" />
+          <button id="removeImageBtn" class="btn-remove" title="Remove image">✕</button>
+        </div>
+        <div class="preview-actions">
+          <button id="analyzeBtn" class="btn btn-accent btn-large">
+            <span class="sparkle">✨</span>
+            <span data-i18n="btn_analyze">Analyze Waste with AI</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading / Scanning State -->
+      <div id="loadingState" class="loading-state hidden">
+        <div class="radar-scanner">
+          <div class="radar-beam"></div>
+          <div class="radar-center">🔍</div>
+        </div>
+        <h4 data-i18n="loading_title">Analyzing waste image...</h4>
+        <p id="funFact" class="fun-fact">Did you know? Wet waste forms over 50% of Indian municipal waste and can be fully composted.</p>
+      </div>
+
+      <!-- Results Display Section -->
+      <div id="resultsSection" class="results-section hidden">
+        <div class="results-header">
+          <div class="results-title-group">
+            <h3 data-i18n="results_title">Segregation Recommendations</h3>
+            <span id="resultsCountBadge" class="items-count-badge">0 Items Detected</span>
+          </div>
+          <button id="scanAnotherBtn" class="btn btn-outline" data-i18n="btn_scan_another">Scan Another Item</button>
+        </div>
+
+        <div id="summaryCard" class="summary-card">
+          <p id="summaryText"></p>
+        </div>
+
+        <!-- Dynamic Item Cards -->
+        <div id="itemsContainer" class="items-grid"></div>
+
+        <!-- Municipal Disclaimer Banner -->
+        <div class="city-disclaimer-card">
+          <span class="disclaimer-icon">ℹ️</span>
+          <div>
+            <strong>Municipal Note:</strong>
+            <span data-i18n="municipal_disclaimer">
+              Bin colours and segregation protocols may vary slightly across Indian municipalities (e.g. Bengaluru, Indore, Delhi, Mumbai). Always verify with your local Nagar Nigam / Urban Local Body.
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Rule-Based Disposal Recommendation Engine (Waste Guide & Manual Classifier) -->
+    <section id="guideSection" class="section-container">
+      <div class="section-header">
+        <span class="section-tag" data-i18n="guide_tag">Rule-Based Knowledge Engine</span>
+        <h3 class="section-title" data-i18n="guide_title">Standard Indian SWM 2016 Waste Guide</h3>
+        <p class="section-desc" data-i18n="guide_desc">
+          Browse or search items directly. This built-in knowledge base backs up our AI model to ensure reliable disposal advice even without camera access.
+        </p>
+
+        <!-- Search & Filter Controls -->
+        <div class="guide-search-bar">
+          <input type="text" id="guideSearchInput" placeholder="Search item (e.g., milk pouch, battery, diaper, vegetable peel)..." />
+          <span class="search-icon">🔎</span>
+        </div>
+
+        <div class="category-filters" id="categoryFilters">
+          <button class="filter-pill active" data-filter="all" data-i18n="filter_all">All Categories</button>
+          <button class="filter-pill" data-filter="wet_organic" data-i18n="filter_wet">Wet / Organic (Green)</button>
+          <button class="filter-pill" data-filter="dry_recyclable" data-i18n="filter_dry">Dry / Recyclable (Blue)</button>
+          <button class="filter-pill" data-filter="hazardous" data-i18n="filter_hazard">Hazardous (Red)</button>
+          <button class="filter-pill" data-filter="e_waste" data-i18n="filter_ewaste">E-Waste</button>
+          <button class="filter-pill" data-filter="sanitary" data-i18n="filter_sanitary">Sanitary / Biomedical</button>
+        </div>
+      </div>
+
+      <!-- Knowledge Cards Grid -->
+      <div id="knowledgeGrid" class="knowledge-grid"></div>
+
+      <!-- Do's and Don'ts Card -->
+      <div class="dos-donts-card">
+        <h4 data-i18n="dos_donts_title">Golden Segregation Rules (Do's & Don'ts)</h4>
+        <div class="dos-donts-grid">
+          <div class="dos-column">
+            <h5 class="column-title do">✅ DO's / क्या करें</h5>
+            <ul>
+              <li data-i18n="do_1">Rinse milk pouches and food plastic containers before dropping into the dry waste bin.</li>
+              <li data-i18n="do_2">Wrap sanitary pads & diapers in paper marked with a red cross or dot.</li>
+              <li data-i18n="do_3">Sell clean paper, cardboard, and metals to your local scrap dealer (Kabadiwala).</li>
+              <li data-i18n="do_4">Compost fruit/vegetable peels at home to create organic fertilizer for house plants.</li>
+            </ul>
+          </div>
+          <div class="donts-column">
+            <h5 class="column-title dont">❌ DON'Ts / क्या न करें</h5>
+            <ul>
+              <li data-i18n="dont_1">Never tie wet kitchen garbage in single-use plastic carry bags.</li>
+              <li data-i18n="dont_2">Never flush diapers, sanitary napkins, or wipes into toilets.</li>
+              <li data-i18n="dont_3">Never dump toxic batteries or tube lights with regular kitchen trash.</li>
+              <li data-i18n="dont_4">Never burn plastic, rubber, or tangled e-waste wires openly.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Gamification & Impact Dashboard Section -->
+    <section id="dashboardSection" class="section-container">
+      <div class="section-header">
+        <span class="section-tag" data-i18n="impact_tag">Gamification & Swachhta Stats</span>
+        <h3 class="section-title" data-i18n="impact_title">Your Swachh Bharat Impact</h3>
+        <p class="section-desc" data-i18n="impact_desc">Track your segregation habits, earn eco-points, and see how much waste you help divert from overflowing landfills.</p>
+      </div>
+
+      <div class="impact-stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">🌱</div>
+          <div class="stat-value" id="totalScansCount">0</div>
+          <div class="stat-label" data-i18n="stat_scans">Items Analyzed</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">⭐</div>
+          <div class="stat-value" id="dashboardEcoPoints">0</div>
+          <div class="stat-label" data-i18n="stat_points">Eco-Points Earned</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📉</div>
+          <div class="stat-value" id="landfillDiverted">0.0 kg</div>
+          <div class="stat-label" data-i18n="stat_landfill">Est. Waste Diverted</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🏆</div>
+          <div class="stat-value" id="badgeTitle">Swachhta Cadet</div>
+          <div class="stat-label" data-i18n="stat_badge">Current Rank</div>
+        </div>
+      </div>
+
+      <!-- Chart and Breakdown -->
+      <div class="chart-section-card">
+        <div class="chart-header">
+          <h4 data-i18n="chart_title">Your Waste Stream Breakdown</h4>
+          <span class="sub-text" data-i18n="chart_sub">Category distribution of scanned waste</span>
+        </div>
+        <div class="chart-content">
+          <canvas id="wasteChart" width="300" height="300"></canvas>
+          <div id="chartLegend" class="chart-legend"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Scan History Section -->
+    <section id="historySection" class="section-container">
+      <div class="section-header flex-between">
+        <div>
+          <span class="section-tag" data-i18n="history_tag">Local Logs</span>
+          <h3 class="section-title" data-i18n="history_title">Recent Scan History</h3>
+        </div>
+        <button id="clearHistoryBtn" class="btn btn-ghost-danger" data-i18n="btn_clear_history">Clear History</button>
+      </div>
+
+      <div id="historyList" class="history-grid">
+        <p class="empty-state" data-i18n="empty_history">No scans recorded yet. Upload or snap your first waste item above!</p>
+      </div>
+    </section>
+
+    <!-- Educational Conclusion Section -->
+    <section class="conclusion-section">
+      <div class="conclusion-content">
+        <span class="conclusion-badge">🇮🇳 Towards Garbage-Free Cities</span>
+        <h3 data-i18n="conclusion_title">The Swachhta Revolution: Segregation at Source</h3>
+        <div class="conclusion-pillars">
+          <div class="pillar-card">
+            <div class="pillar-num">01</div>
+            <h4 data-i18n="pillar1_title">The Challenge</h4>
+            <p data-i18n="pillar1_desc">Indian cities generate over 150,000 tonnes of municipal solid waste daily. When wet and dry waste mix, organic decomposition generates toxic methane gas, foul fires, and leachate that pollutes underground water tables.</p>
+          </div>
+          <div class="pillar-card">
+            <div class="pillar-num">02</div>
+            <h4 data-i18n="pillar2_title">The AI Solution</h4>
+            <p data-i18n="pillar2_desc">EcoSort AI removes ambiguity at the kitchen counter. Instant vision models identify composite packaging, tell citizens the exact bin colour, and protect sanitation workers from dangerous biohazards and broken glass.</p>
+          </div>
+          <div class="pillar-card">
+            <div class="pillar-num">03</div>
+            <h4 data-i18n="pillar3_title">The Circular Economy</h4>
+            <p data-i18n="pillar3_desc">Segregated dry waste flows directly to Kabadiwalas and authorized recycling plants. Organic waste becomes nutrient-dense compost for agriculture. Together, we move towards a zero-landfill India.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="footer-container">
+      <div class="footer-col">
+        <div class="brand">
+          <span class="brand-icon">🌱</span>
+          <span class="brand-text">EcoSort AI</span>
+        </div>
+        <p class="footer-note" data-i18n="footer_mission">
+          Dedicated to Swachh Bharat Mission (Urban 2.0) and SWM Rules 2016. Building citizen-driven sustainable waste habits across Indian homes.
+        </p>
+      </div>
+      <div class="footer-col">
+        <h4>Standards & Compliance</h4>
+        <ul>
+          <li>Ministry of Environment, Forest & Climate Change (MoEFCC)</li>
+          <li>Central Pollution Control Board (CPCB)</li>
+          <li>Solid Waste Management Rules, 2016</li>
+          <li>Plastic Waste Management (PWM) Rules</li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Privacy & Safety</h4>
+        <p>Zero Image Storage: All camera photos are processed purely in memory and immediately discarded. Never touch toxic or biomedical waste barehanded.</p>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2026 EcoSort AI. Built with ❤️ for a Cleaner, Greener India.</p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
